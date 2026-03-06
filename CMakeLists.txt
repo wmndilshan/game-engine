@@ -70,6 +70,7 @@ add_executable(${PROJECT_NAME}
     src/graphics/Texture.cpp
     src/graphics/Mesh.cpp
     src/graphics/Model.cpp
+    src/graphics/Framebuffer.cpp
     ${IMGUI_SOURCES}
 )
 

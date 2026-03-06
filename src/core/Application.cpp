@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -14,6 +15,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 
 namespace engine {
 
@@ -102,6 +104,13 @@ void Application::mouseCallback(GLFWwindow* window, double xpos, double ypos)
     float xposf = static_cast<float>(xpos);
     float yposf = static_cast<float>(ypos);
 
+    // Only look around when right mouse button is held
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) != GLFW_PRESS)
+    {
+        app->m_firstMouse = true;
+        return;
+    }
+
     if (app->m_firstMouse)
     {
         app->m_lastX = xposf;
@@ -135,12 +144,20 @@ int Application::run()
     // Store 'this' so the static mouse callback can reach us
     glfwSetWindowUserPointer(m_window.getHandle(), this);
 
-    // Capture & hide the cursor for FPS-style mouse look
-    glfwSetInputMode(m_window.getHandle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    // Normal cursor so ImGui windows are usable;
+    // camera look is driven by right-mouse-drag (handled in mouseCallback)
     glfwSetCursorPosCallback(m_window.getHandle(), mouseCallback);
 
     initImGui();
     spawnEntities();
+
+    // Create off-screen framebuffer for the 3D viewport
+    if (!m_framebuffer.init(800, 600))
+    {
+        std::fprintf(stderr, "Failed to create framebuffer!\n");
+        m_window.shutdown();
+        return EXIT_FAILURE;
+    }
 
     // Load textures
     if (!m_crateTexture.init("assets/crate.jpg"))
@@ -166,47 +183,43 @@ int Application::run()
         glfwPollEvents();
         processInput();
 
-        // Clear
-        m_renderer.clear({0.15f, 0.15f, 0.15f, 1.0f});
-
-        // Start ImGui frame
+        // ── Start ImGui frame ───────────────────────────────────────────
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // Camera matrices
-        int fbWidth = 0, fbHeight = 0;
-        m_window.getFramebufferSize(fbWidth, fbHeight);
-        float aspect = (fbHeight > 0)
-                           ? static_cast<float>(fbWidth) / static_cast<float>(fbHeight)
-                           : 1.0f;
+        // ── Bind FBO — render 3D scene into off-screen texture ──────────
+        m_framebuffer.bind();
+        glEnable(GL_DEPTH_TEST);
+        m_renderer.clear({0.15f, 0.15f, 0.15f, 1.0f});
+
+        // Camera matrices (use FBO aspect ratio, not window)
+        float fboAspect = (m_framebuffer.getHeight() > 0)
+                              ? static_cast<float>(m_framebuffer.getWidth())
+                                / static_cast<float>(m_framebuffer.getHeight())
+                              : 1.0f;
 
         glm::mat4 view       = m_camera.getViewMatrix();
-        glm::mat4 projection = m_camera.getProjectionMatrix(aspect);
+        glm::mat4 projection = m_camera.getProjectionMatrix(fboAspect);
 
         float time = static_cast<float>(glfwGetTime());
 
-        // ── Draw loaded model ───────────────────────────────────────────
+        // Draw loaded model (flat colour)
         m_renderer.beginScene(view, projection);
-        m_renderer.setHasTexture(false); // model uses flat colour (no texture yet)
+        m_renderer.setHasTexture(false);
         {
             glm::mat4 modelMat(1.0f);
-            // Place the loaded model slightly in front of the camera start pos
             modelMat = glm::translate(modelMat, glm::vec3(0.0f, 0.0f, 0.0f));
             modelMat = glm::rotate(modelMat, time * 0.5f, glm::vec3(0.0f, 1.0f, 0.0f));
             m_renderer.setModelMatrix(modelMat);
             m_model.draw();
         }
 
-        // ── Draw ECS textured cubes ─────────────────────────────────────
-        // Bind the crate texture to unit 0
+        // Draw ECS textured cubes
         m_crateTexture.bind(0);
-
-        // Iterate every entity that has a TransformComponent
         auto& transforms = m_registry.getView<TransformComponent>();
         for (auto& [entity, tc] : transforms)
         {
-            // Build model matrix: translate → rotate (animated) → scale
             glm::mat4 model(1.0f);
             model = glm::translate(model, tc.position);
             model = glm::rotate(model, time + tc.rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -217,28 +230,104 @@ int Application::run()
             m_renderer.drawCube(model, view, projection);
         }
 
-        // ImGui debug overlay
+        // ── Unbind FBO — back to default framebuffer ────────────────────
+        m_framebuffer.unbind();
+
+        // Clear the main window to a dark background
+        int winW = 0, winH = 0;
+        m_window.getFramebufferSize(winW, winH);
+        glViewport(0, 0, winW, winH);
+        glDisable(GL_DEPTH_TEST);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // ── Viewport window (shows the FBO texture) ─────────────────────
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::Begin("Viewport");
+        {
+            ImVec2 avail = ImGui::GetContentRegionAvail();
+            int vpW = static_cast<int>(avail.x);
+            int vpH = static_cast<int>(avail.y);
+
+            // Rescale FBO if viewport changed size
+            if (vpW > 0 && vpH > 0)
+            {
+                m_framebuffer.rescale(vpW, vpH);
+            }
+
+            // Draw the FBO colour texture — UVs flipped vertically for OpenGL
+            ImTextureID texId = static_cast<ImTextureID>(m_framebuffer.getTexture());
+            ImGui::Image(
+                texId,
+                ImVec2(static_cast<float>(m_framebuffer.getWidth()),
+                       static_cast<float>(m_framebuffer.getHeight())),
+                ImVec2(0.0f, 1.0f),   // UV top-left  (flipped)
+                ImVec2(1.0f, 0.0f)    // UV bot-right (flipped)
+            );
+        }
+        ImGui::End();
+        ImGui::PopStyleVar();
+
+        // ── Scene Hierarchy ─────────────────────────────────────────────
+        ImGui::Begin("Scene Hierarchy");
+        {
+            auto& view = m_registry.getView<TransformComponent>();
+            for (auto& [entity, tc] : view)
+            {
+                std::string label = "Entity " + std::to_string(entity);
+                if (ImGui::Selectable(label.c_str(), m_hasSelection && m_selectedEntity == entity))
+                {
+                    m_selectedEntity = entity;
+                    m_hasSelection   = true;
+                }
+            }
+        }
+        ImGui::End();
+
+        // ── Inspector ───────────────────────────────────────────────────
+        ImGui::Begin("Inspector");
+        {
+            if (m_hasSelection)
+            {
+                auto& tc = m_registry.getComponent<TransformComponent>(m_selectedEntity);
+
+                ImGui::Text("Entity %u", m_selectedEntity);
+                ImGui::Separator();
+
+                ImGui::DragFloat3("Position", glm::value_ptr(tc.position), 0.1f);
+                ImGui::DragFloat3("Rotation", glm::value_ptr(tc.rotation), 0.01f);
+                ImGui::DragFloat3("Scale",    glm::value_ptr(tc.scale),    0.1f);
+            }
+            else
+            {
+                ImGui::Text("Select an entity to view properties.");
+            }
+        }
+        ImGui::End();
+
+        // ── Debug overlay ───────────────────────────────────────────────
         ImGui::Begin("Engine Debug");
         ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
         ImGui::Text("ECS Entities: %zu", transforms.size());
         ImGui::Text("Model Meshes: %zu", m_model.meshes.size());
+        ImGui::Text("Viewport: %dx%d", m_framebuffer.getWidth(), m_framebuffer.getHeight());
         ImGui::Separator();
         ImGui::Text("Camera Pos: (%.1f, %.1f, %.1f)",
                      m_camera.Position.x, m_camera.Position.y, m_camera.Position.z);
         ImGui::Text("Yaw: %.1f  Pitch: %.1f", m_camera.Yaw, m_camera.Pitch);
         ImGui::End();
 
-        // Render ImGui
+        // ── Render ImGui & present ──────────────────────────────────────
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        // Present
         m_window.update();
     }
 
     // ── Cleanup ─────────────────────────────────────────────────────────────
 
     shutdownImGui();
+    m_framebuffer.shutdown();
     m_model.shutdown();
     m_crateTexture.shutdown();
     m_renderer.shutdown();
