@@ -7,6 +7,7 @@
 #include "../graphics/Texture.h"
 #include "../graphics/Model.h"
 #include "../graphics/Framebuffer.h"
+#include "../graphics/Skybox.h"
 #include "../ecs/ECS.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -45,6 +46,7 @@ private:
     Texture     m_crateTexture;
     Model       m_model;
     Framebuffer m_framebuffer;
+    Skybox*     m_skybox = nullptr;
 
     // Timing
     float m_deltaTime = 0.0f;

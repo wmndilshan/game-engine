@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 namespace engine {
 
@@ -171,6 +172,25 @@ int Application::run()
         std::fprintf(stderr, "Warning: model not loaded, only ECS cubes will render.\n");
     }
 
+    // Load skybox cubemap
+    {
+        std::vector<std::string> faces = {
+            "assets/skybox/right.jpg",
+            "assets/skybox/left.jpg",
+            "assets/skybox/top.jpg",
+            "assets/skybox/bottom.jpg",
+            "assets/skybox/front.jpg",
+            "assets/skybox/back.jpg"
+        };
+        m_skybox = new Skybox();
+        if (!m_skybox->init(faces))
+        {
+            std::fprintf(stderr, "Warning: skybox not loaded, sky will be plain colour.\n");
+            delete m_skybox;
+            m_skybox = nullptr;
+        }
+    }
+
     // ── Game loop ───────────────────────────────────────────────────────────
 
     while (!m_window.shouldClose())
@@ -192,6 +212,7 @@ int Application::run()
         m_framebuffer.bind();
         glEnable(GL_DEPTH_TEST);
         m_renderer.clear({0.15f, 0.15f, 0.15f, 1.0f});
+        m_framebuffer.clearEntityIDs();  // clear entity-ID attachment to -1
 
         // Camera matrices (use FBO aspect ratio, not window)
         float fboAspect = (m_framebuffer.getHeight() > 0)
@@ -204,9 +225,10 @@ int Application::run()
 
         float time = static_cast<float>(glfwGetTime());
 
-        // Draw loaded model (flat colour)
+        // Draw loaded model (flat colour, not a pickable entity)
         m_renderer.beginScene(view, projection);
         m_renderer.setHasTexture(false);
+        m_renderer.setEntityID(-1);
         {
             glm::mat4 modelMat(1.0f);
             modelMat = glm::translate(modelMat, glm::vec3(0.0f, 0.0f, 0.0f));
@@ -215,7 +237,7 @@ int Application::run()
             m_model.draw();
         }
 
-        // Draw ECS textured cubes
+        // Draw ECS textured cubes (each writes its entity ID for picking)
         m_crateTexture.bind(0);
         auto& transforms = m_registry.getView<TransformComponent>();
         for (auto& [entity, tc] : transforms)
@@ -227,7 +249,13 @@ int Application::run()
             model = glm::rotate(model, time + tc.rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
             model = glm::scale(model, tc.scale);
 
-            m_renderer.drawCube(model, view, projection);
+            m_renderer.drawCube(model, view, projection, static_cast<int>(entity));
+        }
+
+        // Draw skybox (rendered last with depth trick so it appears behind everything)
+        if (m_skybox)
+        {
+            m_skybox->draw(view, projection);
         }
 
         // ── Unbind FBO — back to default framebuffer ────────────────────
@@ -264,6 +292,41 @@ int Application::run()
                 ImVec2(0.0f, 1.0f),   // UV top-left  (flipped)
                 ImVec2(1.0f, 0.0f)    // UV bot-right (flipped)
             );
+
+            // ── Mouse picking via entity-ID attachment ───────────────────
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered())
+            {
+                ImVec2 viewportMin    = ImGui::GetWindowContentRegionMin();
+                ImVec2 viewportOffset = ImGui::GetWindowPos();
+                ImVec2 mousePos       = ImGui::GetMousePos();
+
+                // Mouse position relative to the viewport content region
+                float localX = mousePos.x - (viewportOffset.x + viewportMin.x);
+                float localY = mousePos.y - (viewportOffset.y + viewportMin.y);
+
+                int pixelX = static_cast<int>(localX);
+                // Flip Y: OpenGL origin is bottom-left, ImGui is top-left
+                int pixelY = m_framebuffer.getHeight() - static_cast<int>(localY);
+
+                if (pixelX >= 0 && pixelX < m_framebuffer.getWidth() &&
+                    pixelY >= 0 && pixelY < m_framebuffer.getHeight())
+                {
+                    int pickedID = m_framebuffer.readPixel(
+                        static_cast<std::uint32_t>(pixelX),
+                        static_cast<std::uint32_t>(pixelY)
+                    );
+
+                    if (pickedID >= 0)
+                    {
+                        m_selectedEntity = static_cast<std::uint32_t>(pickedID);
+                        m_hasSelection   = true;
+                    }
+                    else
+                    {
+                        m_hasSelection = false;
+                    }
+                }
+            }
         }
         ImGui::End();
         ImGui::PopStyleVar();
@@ -327,6 +390,12 @@ int Application::run()
     // ── Cleanup ─────────────────────────────────────────────────────────────
 
     shutdownImGui();
+    if (m_skybox)
+    {
+        m_skybox->shutdown();
+        delete m_skybox;
+        m_skybox = nullptr;
+    }
     m_framebuffer.shutdown();
     m_model.shutdown();
     m_crateTexture.shutdown();

@@ -44,11 +44,15 @@ in vec2 TexCoord;
 in vec3 FragNormal;
 in vec3 FragPos;
 
+out vec4 color0;    // colour attachment 0 — scene colour
+out int  color1;    // colour attachment 1 — entity ID (R32I)
+
 uniform sampler2D u_Texture;
 uniform float u_HasTexture;     // 1.0 = textured, 0.0 = use flat colour
 uniform vec3  u_LightDir;       // direction TO the light (normalised)
 uniform vec3  u_LightColor;
 uniform vec3  u_ObjectColor;    // fallback when there is no texture
+uniform int   u_EntityID;       // ECS entity ID for mouse picking
 
 void main()
 {
@@ -68,7 +72,8 @@ void main()
     vec3 surfaceColor = mix(u_ObjectColor, texColor, u_HasTexture);
 
     vec3 result = (ambient + diffuse) * surfaceColor;
-    gl_FragData[0] = vec4(result, 1.0);
+    color0 = vec4(result, 1.0);
+    color1 = u_EntityID;
 }
 )";
 
@@ -159,6 +164,10 @@ static GLuint linkProgram(GLuint vert, GLuint frag)
     glBindAttribLocation(program, 1, "aNormal");
     glBindAttribLocation(program, 2, "aTexCoord");
 
+    // Bind fragment data locations for MRT (colour attachment 0 & 1)
+    glBindFragDataLocation(program, 0, "color0");
+    glBindFragDataLocation(program, 1, "color1");
+
     glLinkProgram(program);
 
     GLint success = 0;
@@ -196,10 +205,12 @@ bool Renderer::init()
     m_locLightDir    = glGetUniformLocation(m_shaderProgram, "u_LightDir");
     m_locLightColor  = glGetUniformLocation(m_shaderProgram, "u_LightColor");
     m_locObjectColor = glGetUniformLocation(m_shaderProgram, "u_ObjectColor");
+    m_locEntityID    = glGetUniformLocation(m_shaderProgram, "u_EntityID");
 
     // Set the texture sampler to unit 0 (only needs to be done once)
     glUseProgram(m_shaderProgram);
     glUniform1i(glGetUniformLocation(m_shaderProgram, "u_Texture"), 0);
+    glUniform1i(m_locEntityID, -1);  // default: no entity
 
     // Default light direction (from upper-right-front)
     glm::vec3 lightDir = glm::normalize(glm::vec3(0.5f, 1.0f, 0.8f));
@@ -249,7 +260,8 @@ void Renderer::clear(const glm::vec4& color)
 
 void Renderer::drawCube(const glm::mat4& model,
                         const glm::mat4& view,
-                        const glm::mat4& projection)
+                        const glm::mat4& projection,
+                        int entityID)
 {
     glUseProgram(m_shaderProgram);
 
@@ -257,6 +269,7 @@ void Renderer::drawCube(const glm::mat4& model,
     glUniformMatrix4fv(m_locView,       1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(m_locProjection, 1, GL_FALSE, glm::value_ptr(projection));
     glUniform1f(m_locHasTexture, 1.0f);  // built-in cubes use bound texture
+    glUniform1i(m_locEntityID, entityID);
 
     glBindVertexArray(m_VAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -278,6 +291,11 @@ void Renderer::setModelMatrix(const glm::mat4& model)
 void Renderer::setHasTexture(bool has)
 {
     glUniform1f(m_locHasTexture, has ? 1.0f : 0.0f);
+}
+
+void Renderer::setEntityID(int id)
+{
+    glUniform1i(m_locEntityID, id);
 }
 
 void Renderer::shutdown()

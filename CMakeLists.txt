@@ -71,6 +71,7 @@ add_executable(${PROJECT_NAME}
     src/graphics/Mesh.cpp
     src/graphics/Model.cpp
     src/graphics/Framebuffer.cpp
+    src/graphics/Skybox.cpp
     ${IMGUI_SOURCES}
 )
 

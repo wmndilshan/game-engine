@@ -20,9 +20,11 @@ public:
     void clear(const glm::vec4& color);
 
     /// Draw the built-in cube with the given MVP matrices.
+    /// @param entityID  The ECS entity ID written to the picking attachment (-1 = none).
     void drawCube(const glm::mat4& model,
                   const glm::mat4& view,
-                  const glm::mat4& projection);
+                  const glm::mat4& projection,
+                  int entityID = -1);
 
     /// Bind the shader and set view/projection. Call once per frame before drawing models.
     void beginScene(const glm::mat4& view, const glm::mat4& projection);
@@ -32,6 +34,9 @@ public:
 
     /// Set whether the next draw call should use a bound texture (1) or flat colour (0).
     void setHasTexture(bool has);
+
+    /// Set the entity ID written to the picking colour attachment.
+    void setEntityID(int id);
 
     /// Release all GPU resources.
     void shutdown();
@@ -51,6 +56,7 @@ private:
     int m_locLightDir    = -1;
     int m_locLightColor  = -1;
     int m_locObjectColor = -1;
+    int m_locEntityID    = -1;
 };
 
 } // namespace engine
