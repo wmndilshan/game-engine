@@ -36,7 +36,16 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
-FetchContent_MakeAvailable(glfw glm imgui)
+# Assimp (disable tests and tools to speed up compile time)
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    assimp
+    GIT_REPOSITORY https://github.com/assimp/assimp.git
+    GIT_TAG        v5.3.1
+)
+
+FetchContent_MakeAvailable(glfw glm imgui assimp)
 
 # ── ImGui source files (core + GLFW/OpenGL3 backends) ───────────────────────
 set(IMGUI_SOURCES
@@ -59,6 +68,8 @@ add_executable(${PROJECT_NAME}
     src/graphics/Renderer.cpp
     src/graphics/Camera.cpp
     src/graphics/Texture.cpp
+    src/graphics/Mesh.cpp
+    src/graphics/Model.cpp
     ${IMGUI_SOURCES}
 )
 
@@ -73,4 +84,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glfw
     glm::glm
     opengl32
+    assimp
 )

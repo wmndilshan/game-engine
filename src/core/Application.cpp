@@ -148,6 +148,12 @@ int Application::run()
         std::fprintf(stderr, "Warning: crate texture not found, cubes will be untextured.\n");
     }
 
+    // Load 3D model via Assimp
+    if (!m_model.loadModel("assets/cube.obj"))
+    {
+        std::fprintf(stderr, "Warning: model not loaded, only ECS cubes will render.\n");
+    }
+
     // ── Game loop ───────────────────────────────────────────────────────────
 
     while (!m_window.shouldClose())
@@ -180,6 +186,19 @@ int Application::run()
 
         float time = static_cast<float>(glfwGetTime());
 
+        // ── Draw loaded model ───────────────────────────────────────────
+        m_renderer.beginScene(view, projection);
+        m_renderer.setHasTexture(false); // model uses flat colour (no texture yet)
+        {
+            glm::mat4 modelMat(1.0f);
+            // Place the loaded model slightly in front of the camera start pos
+            modelMat = glm::translate(modelMat, glm::vec3(0.0f, 0.0f, 0.0f));
+            modelMat = glm::rotate(modelMat, time * 0.5f, glm::vec3(0.0f, 1.0f, 0.0f));
+            m_renderer.setModelMatrix(modelMat);
+            m_model.draw();
+        }
+
+        // ── Draw ECS textured cubes ─────────────────────────────────────
         // Bind the crate texture to unit 0
         m_crateTexture.bind(0);
 
@@ -201,7 +220,8 @@ int Application::run()
         // ImGui debug overlay
         ImGui::Begin("Engine Debug");
         ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-        ImGui::Text("Entities: %zu", transforms.size());
+        ImGui::Text("ECS Entities: %zu", transforms.size());
+        ImGui::Text("Model Meshes: %zu", m_model.meshes.size());
         ImGui::Separator();
         ImGui::Text("Camera Pos: (%.1f, %.1f, %.1f)",
                      m_camera.Position.x, m_camera.Position.y, m_camera.Position.z);
@@ -219,6 +239,7 @@ int Application::run()
     // ── Cleanup ─────────────────────────────────────────────────────────────
 
     shutdownImGui();
+    m_model.shutdown();
     m_crateTexture.shutdown();
     m_renderer.shutdown();
     m_window.shutdown();

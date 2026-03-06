@@ -5,6 +5,7 @@
 #include "../graphics/Renderer.h"
 #include "../graphics/Camera.h"
 #include "../graphics/Texture.h"
+#include "../graphics/Model.h"
 #include "../ecs/ECS.h"
 
 struct GLFWwindow;
@@ -38,6 +39,7 @@ private:
     Registry m_registry;
     Camera   m_camera{glm::vec3(0.0f, 0.0f, 7.0f)};
     Texture  m_crateTexture;
+    Model    m_model;
 
     // Timing
     float m_deltaTime = 0.0f;

@@ -9,14 +9,19 @@
 namespace engine {
 
 // ── Shader sources (GLSL 1.40 — compatible with OpenGL 3.1+) ───────────────
+// These shaders support Position (attrib 0), Normal (attrib 1), TexCoords (attrib 2).
+// A simple directional light + ambient provides basic shading for loaded models.
 
 static const char* vertexShaderSource = R"(
 #version 140
 
 in vec3 aPos;
+in vec3 aNormal;
 in vec2 aTexCoord;
 
 out vec2 TexCoord;
+out vec3 FragNormal;
+out vec3 FragPos;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -24,8 +29,11 @@ uniform mat4 projection;
 
 void main()
 {
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
-    TexCoord = aTexCoord;
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    FragPos   = worldPos.xyz;
+    FragNormal = mat3(model) * aNormal;   // simple normal transform (no non-uniform scale)
+    TexCoord   = aTexCoord;
+    gl_Position = projection * view * worldPos;
 }
 )";
 
@@ -33,69 +41,91 @@ static const char* fragmentShaderSource = R"(
 #version 140
 
 in vec2 TexCoord;
+in vec3 FragNormal;
+in vec3 FragPos;
 
 uniform sampler2D u_Texture;
+uniform float u_HasTexture;     // 1.0 = textured, 0.0 = use flat colour
+uniform vec3  u_LightDir;       // direction TO the light (normalised)
+uniform vec3  u_LightColor;
+uniform vec3  u_ObjectColor;    // fallback when there is no texture
 
 void main()
 {
-    gl_FragData[0] = texture(u_Texture, TexCoord);
+    // Normalise interpolated normal
+    vec3 norm = normalize(FragNormal);
+
+    // Ambient
+    float ambientStrength = 0.3;
+    vec3 ambient = ambientStrength * u_LightColor;
+
+    // Diffuse
+    float diff = max(dot(norm, u_LightDir), 0.0);
+    vec3 diffuse = diff * u_LightColor;
+
+    // Surface colour — blend between flat colour and texture via u_HasTexture
+    vec3 texColor  = texture(u_Texture, TexCoord).rgb;
+    vec3 surfaceColor = mix(u_ObjectColor, texColor, u_HasTexture);
+
+    vec3 result = (ambient + diffuse) * surfaceColor;
+    gl_FragData[0] = vec4(result, 1.0);
 }
 )";
 
-// ── Cube vertex data (position XYZ + UV) ───────────────────────────────────
+// ── Cube vertex data (position XYZ + normal XYZ + UV) ──────────────────────
 // 36 vertices — 6 faces × 2 triangles × 3 verts, no index buffer needed.
-// Stride: 5 floats per vertex (3 pos + 2 uv).
+// Stride: 8 floats per vertex (3 pos + 3 normal + 2 uv).
 
 // clang-format off
 static const float cubeVertices[] = {
-    // positions          // UVs
-    // Front face
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    // positions          // normals           // UVs
+    // Front face (+Z)
+    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
 
-    // Back face
-    -0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-    -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+    // Back face (-Z)
+    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,
 
-    // Left face
-    -0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-    -0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-    -0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+    // Left face (-X)
+    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
+    -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
+    -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
 
-    // Right face
-     0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+    // Right face (+X)
+     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
 
-    // Top face
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+    // Top face (+Y)
+    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
 
-    // Bottom face
-    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,  1.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,  1.0f, 1.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+    // Bottom face (-Y)
+    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,
 };
 // clang-format on
 
@@ -126,7 +156,8 @@ static GLuint linkProgram(GLuint vert, GLuint frag)
 
     // GLSL 1.40 has no layout qualifiers — bind locations manually
     glBindAttribLocation(program, 0, "aPos");
-    glBindAttribLocation(program, 1, "aTexCoord");
+    glBindAttribLocation(program, 1, "aNormal");
+    glBindAttribLocation(program, 2, "aTexCoord");
 
     glLinkProgram(program);
 
@@ -160,9 +191,22 @@ bool Renderer::init()
     m_locView       = glGetUniformLocation(m_shaderProgram, "view");
     m_locProjection = glGetUniformLocation(m_shaderProgram, "projection");
 
+    // Lighting & material uniforms
+    m_locHasTexture  = glGetUniformLocation(m_shaderProgram, "u_HasTexture");
+    m_locLightDir    = glGetUniformLocation(m_shaderProgram, "u_LightDir");
+    m_locLightColor  = glGetUniformLocation(m_shaderProgram, "u_LightColor");
+    m_locObjectColor = glGetUniformLocation(m_shaderProgram, "u_ObjectColor");
+
     // Set the texture sampler to unit 0 (only needs to be done once)
     glUseProgram(m_shaderProgram);
     glUniform1i(glGetUniformLocation(m_shaderProgram, "u_Texture"), 0);
+
+    // Default light direction (from upper-right-front)
+    glm::vec3 lightDir = glm::normalize(glm::vec3(0.5f, 1.0f, 0.8f));
+    glUniform3f(m_locLightDir, lightDir.x, lightDir.y, lightDir.z);
+    glUniform3f(m_locLightColor, 1.0f, 1.0f, 1.0f);
+    glUniform3f(m_locObjectColor, 0.8f, 0.5f, 0.3f); // warm orange fallback
+    glUniform1f(m_locHasTexture, 0.0f);                // no texture by default
     glUseProgram(0);
 
     // VAO / VBO
@@ -174,15 +218,20 @@ bool Renderer::init()
     glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
 
-    // position  (location = 0)  —  3 floats, stride = 5 floats
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+    // position  (location = 0)  —  3 floats, stride = 8 floats
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
                           reinterpret_cast<void*>(0));
     glEnableVertexAttribArray(0);
 
-    // texcoord  (location = 1)  —  2 floats, offset = 3 floats
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+    // normal    (location = 1)  —  3 floats, offset = 3 floats
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
                           reinterpret_cast<void*>(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    // texcoord  (location = 2)  —  2 floats, offset = 6 floats
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float),
+                          reinterpret_cast<void*>(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);
 
@@ -207,10 +256,28 @@ void Renderer::drawCube(const glm::mat4& model,
     glUniformMatrix4fv(m_locModel,      1, GL_FALSE, glm::value_ptr(model));
     glUniformMatrix4fv(m_locView,       1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(m_locProjection, 1, GL_FALSE, glm::value_ptr(projection));
+    glUniform1f(m_locHasTexture, 1.0f);  // built-in cubes use bound texture
 
     glBindVertexArray(m_VAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
+}
+
+void Renderer::beginScene(const glm::mat4& view, const glm::mat4& projection)
+{
+    glUseProgram(m_shaderProgram);
+    glUniformMatrix4fv(m_locView,       1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(m_locProjection, 1, GL_FALSE, glm::value_ptr(projection));
+}
+
+void Renderer::setModelMatrix(const glm::mat4& model)
+{
+    glUniformMatrix4fv(m_locModel, 1, GL_FALSE, glm::value_ptr(model));
+}
+
+void Renderer::setHasTexture(bool has)
+{
+    glUniform1f(m_locHasTexture, has ? 1.0f : 0.0f);
 }
 
 void Renderer::shutdown()
