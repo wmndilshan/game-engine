@@ -11,7 +11,11 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include "../ImGuizmo/ImGuizmo.h"
+
 #include "../ecs/Components.h"
+
+#include "SceneSerializer.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -207,6 +211,7 @@ int Application::run()
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        ImGuizmo::BeginFrame();
 
         // ── Bind FBO — render 3D scene into off-screen texture ──────────
         m_framebuffer.bind();
@@ -293,8 +298,73 @@ int Application::run()
                 ImVec2(1.0f, 0.0f)    // UV bot-right (flipped)
             );
 
+            // ── ImGuizmo setup ───────────────────────────────────────────
+            ImVec2 vpMin    = ImGui::GetWindowContentRegionMin();
+            ImVec2 vpOffset = ImGui::GetWindowPos();
+            float  vpX      = vpOffset.x + vpMin.x;
+            float  vpY      = vpOffset.y + vpMin.y;
+            float  vpWf     = static_cast<float>(m_framebuffer.getWidth());
+            float  vpHf     = static_cast<float>(m_framebuffer.getHeight());
+
+            ImGuizmo::SetOrthographic(false);
+            ImGuizmo::SetDrawlist();
+            ImGuizmo::SetRect(vpX, vpY, vpWf, vpHf);
+
+            // Keyboard shortcuts for gizmo mode (only when viewport is hovered)
+            if (ImGui::IsWindowHovered())
+            {
+                if (ImGui::IsKeyPressed(ImGuiKey_T))
+                    m_gizmoType = ImGuizmo::TRANSLATE;
+                if (ImGui::IsKeyPressed(ImGuiKey_R))
+                    m_gizmoType = ImGuizmo::ROTATE;
+                if (ImGui::IsKeyPressed(ImGuiKey_E))
+                    m_gizmoType = ImGuizmo::SCALE;
+            }
+
+            // Draw gizmo for selected entity
+            if (m_hasSelection && m_gizmoType != -1)
+            {
+                auto& tc = m_registry.getComponent<TransformComponent>(m_selectedEntity);
+
+                // Build the current model matrix from the entity's transform
+                glm::mat4 gizmoModel(1.0f);
+                gizmoModel = glm::translate(gizmoModel, tc.position);
+                gizmoModel = glm::rotate(gizmoModel, tc.rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+                gizmoModel = glm::rotate(gizmoModel, tc.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+                gizmoModel = glm::rotate(gizmoModel, tc.rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+                gizmoModel = glm::scale(gizmoModel, tc.scale);
+
+                glm::mat4 gizmoView = m_camera.getViewMatrix();
+                glm::mat4 gizmoProj = m_camera.getProjectionMatrix(fboAspect);
+
+                ImGuizmo::Manipulate(
+                    glm::value_ptr(gizmoView),
+                    glm::value_ptr(gizmoProj),
+                    static_cast<ImGuizmo::OPERATION>(m_gizmoType),
+                    ImGuizmo::LOCAL,
+                    glm::value_ptr(gizmoModel)
+                );
+
+                // If the user is dragging the gizmo, decompose the matrix back
+                if (ImGuizmo::IsUsing())
+                {
+                    glm::vec3 translation, scale, skew;
+                    glm::vec4 perspective;
+                    glm::quat rotationQuat;
+
+                    glm::decompose(gizmoModel, scale, rotationQuat, translation, skew, perspective);
+
+                    tc.position = translation;
+                    tc.rotation = glm::eulerAngles(rotationQuat);
+                    tc.scale    = scale;
+                }
+            }
+
             // ── Mouse picking via entity-ID attachment ───────────────────
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered())
+            // Don't pick when the gizmo is being interacted with
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+                && ImGui::IsWindowHovered()
+                && !ImGuizmo::IsOver())
             {
                 ImVec2 viewportMin    = ImGui::GetWindowContentRegionMin();
                 ImVec2 viewportOffset = ImGui::GetWindowPos();
@@ -367,6 +437,25 @@ int Application::run()
             }
         }
         ImGui::End();
+
+        // ── Main Menu Bar ───────────────────────────────────────────
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("File"))
+            {
+                if (ImGui::MenuItem("Save Scene"))
+                {
+                    SceneSerializer::Serialize(m_registry, "assets/scene.json");
+                }
+                if (ImGui::MenuItem("Load Scene"))
+                {
+                    m_hasSelection = false;
+                    SceneSerializer::Deserialize(m_registry, "assets/scene.json");
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
 
         // ── Debug overlay ───────────────────────────────────────────────
         ImGui::Begin("Engine Debug");

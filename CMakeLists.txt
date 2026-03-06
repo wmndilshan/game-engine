@@ -65,6 +65,7 @@ add_executable(${PROJECT_NAME}
     src/core/Window.cpp
     src/core/Application.cpp
     src/core/Input.cpp
+    src/core/SceneSerializer.cpp
     src/graphics/Renderer.cpp
     src/graphics/Camera.cpp
     src/graphics/Texture.cpp
@@ -72,6 +73,7 @@ add_executable(${PROJECT_NAME}
     src/graphics/Model.cpp
     src/graphics/Framebuffer.cpp
     src/graphics/Skybox.cpp
+    src/ImGuizmo/ImGuizmo.cpp
     ${IMGUI_SOURCES}
 )
 

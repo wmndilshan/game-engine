@@ -31,6 +31,13 @@ public:
         return m_nextEntity++;
     }
 
+    /// Reset the registry to a blank state (removes all entities and components).
+    void clear()
+    {
+        m_pools.clear();
+        m_nextEntity = 0;
+    }
+
     // ── Component management ────────────────────────────────────────────
 
     /// Attach a component of type T to an entity (moves / copies the value).

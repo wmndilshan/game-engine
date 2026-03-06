@@ -11,7 +11,12 @@
 #include "../ecs/ECS.h"
 
 #include <glm/gtc/type_ptr.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/matrix_decompose.hpp>
 #include <cstdint>
+
+#include "imgui.h"
+#include "../ImGuizmo/ImGuizmo.h"
 
 struct GLFWwindow;
 
@@ -60,6 +65,9 @@ private:
     // Entity selection (for Inspector panel)
     std::uint32_t m_selectedEntity = 0;
     bool          m_hasSelection   = false;
+
+    // Gizmo operation (-1 = none, else ImGuizmo::OPERATION)
+    int m_gizmoType = -1;
 };
 
 } // namespace engine
