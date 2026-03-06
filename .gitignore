@@ -1,0 +1,23 @@
+# Build output
+build/
+
+# IDE / editor
+.vscode/
+.vs/
+*.swp
+*.swo
+*~
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Dependencies fetched by CMake
+_deps/
