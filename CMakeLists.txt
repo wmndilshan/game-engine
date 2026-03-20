@@ -45,7 +45,14 @@ FetchContent_Declare(
     GIT_TAG        v5.3.1
 )
 
-FetchContent_MakeAvailable(glfw glm imgui assimp)
+# ReactPhysics3D
+FetchContent_Declare(
+    reactphysics3d
+    GIT_REPOSITORY https://github.com/DanielChappuis/reactphysics3d.git
+    GIT_TAG        v0.9.0
+)
+
+FetchContent_MakeAvailable(glfw glm imgui assimp reactphysics3d)
 
 # ── ImGui source files (core + GLFW/OpenGL3 backends) ───────────────────────
 set(IMGUI_SOURCES
@@ -73,6 +80,7 @@ add_executable(${PROJECT_NAME}
     src/graphics/Model.cpp
     src/graphics/Framebuffer.cpp
     src/graphics/Skybox.cpp
+    src/physics/PhysicsSystem.cpp
     src/ImGuizmo/ImGuizmo.cpp
     ${IMGUI_SOURCES}
 )
@@ -89,4 +97,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     opengl32
     assimp
+    reactphysics3d
 )

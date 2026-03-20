@@ -17,6 +17,8 @@
 
 #include "SceneSerializer.h"
 
+#include "../physics/PhysicsSystem.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -156,6 +158,31 @@ int Application::run()
     initImGui();
     spawnEntities();
 
+    // ── Physics ─────────────────────────────────────────────────────────
+    m_physics.init();
+
+    // Create a floor entity (static, wide platform at Y = -2)
+    {
+        Entity floor = m_registry.createEntity();
+        TransformComponent tc;
+        tc.position = {0.0f, -2.0f, 0.0f};
+        tc.scale    = {10.0f, 1.0f, 10.0f};
+        m_registry.addComponent(floor, tc);
+        m_physics.addRigidBody(floor, m_registry, true);   // static
+    }
+
+    // Add dynamic rigid bodies to the cubes that spawnEntities() created
+    {
+        auto& transforms = m_registry.getView<TransformComponent>();
+        auto& rigidBodies = m_registry.getView<RigidBodyComponent>();
+        for (auto& [entity, tc] : transforms)
+        {
+            // Skip entities that already have a RigidBodyComponent (e.g. floor)
+            if (rigidBodies.find(entity) != rigidBodies.end()) continue;
+            m_physics.addRigidBody(entity, m_registry, false);  // dynamic
+        }
+    }
+
     // Create off-screen framebuffer for the 3D viewport
     if (!m_framebuffer.init(800, 600))
     {
@@ -213,6 +240,9 @@ int Application::run()
         ImGui::NewFrame();
         ImGuizmo::BeginFrame();
 
+        // ── Step physics ────────────────────────────────────────────────
+        m_physics.stepPhysics(m_registry, m_deltaTime);
+
         // ── Bind FBO — render 3D scene into off-screen texture ──────────
         m_framebuffer.bind();
         glEnable(GL_DEPTH_TEST);
@@ -249,9 +279,9 @@ int Application::run()
         {
             glm::mat4 model(1.0f);
             model = glm::translate(model, tc.position);
-            model = glm::rotate(model, time + tc.rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-            model = glm::rotate(model, time + tc.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-            model = glm::rotate(model, time + tc.rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+            model = glm::rotate(model, tc.rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::rotate(model, tc.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::rotate(model, tc.rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
             model = glm::scale(model, tc.scale);
 
             m_renderer.drawCube(model, view, projection, static_cast<int>(entity));
@@ -479,6 +509,7 @@ int Application::run()
     // ── Cleanup ─────────────────────────────────────────────────────────────
 
     shutdownImGui();
+    m_physics.shutdown();
     if (m_skybox)
     {
         m_skybox->shutdown();

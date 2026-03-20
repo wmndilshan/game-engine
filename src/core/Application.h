@@ -9,6 +9,7 @@
 #include "../graphics/Framebuffer.h"
 #include "../graphics/Skybox.h"
 #include "../ecs/ECS.h"
+#include "../physics/PhysicsSystem.h"
 
 #include <glm/gtc/type_ptr.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
@@ -44,10 +45,11 @@ private:
     /// GLFW mouse-move callback (static — uses GLFW user pointer to reach *this).
     static void mouseCallback(GLFWwindow* window, double xpos, double ypos);
 
-    Window   m_window;
-    Renderer m_renderer;
-    Registry m_registry;
-    Camera   m_camera{glm::vec3(0.0f, 0.0f, 7.0f)};
+    Window        m_window;
+    Renderer      m_renderer;
+    Registry      m_registry;
+    PhysicsSystem m_physics;
+    Camera        m_camera{glm::vec3(0.0f, 0.0f, 7.0f)};
     Texture     m_crateTexture;
     Model       m_model;
     Framebuffer m_framebuffer;
