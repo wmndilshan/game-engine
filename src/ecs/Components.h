@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <reactphysics3d/reactphysics3d.h>
 
+#include "../scripting/ScriptableEntity.h"
+
 namespace engine {
 
 struct TransformComponent
@@ -20,6 +22,29 @@ struct RigidBodyComponent
 struct BoxColliderComponent
 {
     reactphysics3d::Collider* collider = nullptr;
+};
+
+struct NativeScriptComponent
+{
+    ScriptableEntity* Instance = nullptr;
+
+    ScriptableEntity* (*InstantiateScript)() = nullptr;
+    void (*DestroyScript)(NativeScriptComponent*) = nullptr;
+
+    template <typename T>
+    void Bind()
+    {
+        InstantiateScript = []()
+        {
+            return static_cast<ScriptableEntity*>(new T());
+        };
+
+        DestroyScript = [](NativeScriptComponent* nsc)
+        {
+            delete nsc->Instance;
+            nsc->Instance = nullptr;
+        };
+    }
 };
 
 } // namespace engine

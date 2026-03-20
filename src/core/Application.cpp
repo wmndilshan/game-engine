@@ -18,6 +18,7 @@
 #include "SceneSerializer.h"
 
 #include "../physics/PhysicsSystem.h"
+#include "../scripting/PlayerController.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -161,6 +162,20 @@ int Application::run()
     // ── Physics ─────────────────────────────────────────────────────────
     m_physics.init();
 
+    // Create a "Player" entity and attach a native script
+    Entity playerEntity = m_registry.createEntity();
+    {
+        TransformComponent tc;
+        tc.position = {0.0f, 2.0f, 0.0f};
+        tc.rotation = {0.0f, 0.0f, 0.0f};
+        tc.scale    = {1.0f, 1.0f, 1.0f};
+        m_registry.addComponent(playerEntity, tc);
+
+        NativeScriptComponent nsc;
+        nsc.Bind<PlayerController>();
+        m_registry.addComponent(playerEntity, nsc);
+    }
+
     // Create a floor entity (static, wide platform at Y = -2)
     {
         Entity floor = m_registry.createEntity();
@@ -239,6 +254,29 @@ int Application::run()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ImGuizmo::BeginFrame();
+
+        // ── Run native scripts (create on first use) ───────────────────
+        {
+            auto& scripts = m_registry.getView<NativeScriptComponent>();
+            for (auto& [entity, script] : scripts)
+            {
+                if (!script.Instance)
+                {
+                    script.Instance = script.InstantiateScript ? script.InstantiateScript() : nullptr;
+                    if (script.Instance)
+                    {
+                        script.Instance->m_Entity  = entity;
+                        script.Instance->m_Registry = &m_registry;
+                        script.Instance->OnCreate();
+                    }
+                }
+
+                if (script.Instance)
+                {
+                    script.Instance->OnUpdate(m_deltaTime);
+                }
+            }
+        }
 
         // ── Step physics ────────────────────────────────────────────────
         m_physics.stepPhysics(m_registry, m_deltaTime);
@@ -509,6 +547,20 @@ int Application::run()
     // ── Cleanup ─────────────────────────────────────────────────────────────
 
     shutdownImGui();
+
+    // Destroy native script instances
+    {
+        auto& scripts = m_registry.getView<NativeScriptComponent>();
+        for (auto& [entity, script] : scripts)
+        {
+            (void)entity;
+            if (script.Instance)
+                script.Instance->OnDestroy();
+            if (script.DestroyScript)
+                script.DestroyScript(&script);
+        }
+    }
+
     m_physics.shutdown();
     if (m_skybox)
     {
