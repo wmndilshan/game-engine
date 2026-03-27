@@ -20,6 +20,7 @@ public:
     /// Create a rigid body (and a unit-box collider) for the given entity.
     /// @param isStatic  true → STATIC body, false → DYNAMIC body.
     void addRigidBody(Entity entity, Registry& registry, bool isStatic);
+    void rebuildWorld(Registry& registry);
 
     /// Clean up the physics world.
     void shutdown();

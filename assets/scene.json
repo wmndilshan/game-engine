@@ -1,0 +1,73 @@
+{
+    "entities": [
+        {
+            "id": 0,
+            "tag": "Left Cube",
+            "transform": {
+                "position": [-2.5, 0.0, 0.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "color": [0.85, 0.25, 0.25],
+            "rigidbody": {
+                "isStatic": false
+            }
+        },
+        {
+            "id": 1,
+            "tag": "Center Cube",
+            "transform": {
+                "position": [0.0, 0.0, 0.0],
+                "rotation": [0.5, 0.3, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "color": [0.25, 0.85, 0.35],
+            "rigidbody": {
+                "isStatic": false
+            }
+        },
+        {
+            "id": 2,
+            "tag": "Right Cube",
+            "transform": {
+                "position": [2.5, 0.0, 0.0],
+                "rotation": [0.0, 0.7, 0.2],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "color": [0.25, 0.45, 0.95],
+            "rigidbody": {
+                "isStatic": false
+            }
+        },
+        {
+            "id": 3,
+            "tag": "Player",
+            "transform": {
+                "position": [0.0, 2.0, 0.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "rigidbody": {
+                "isStatic": false
+            },
+            "audio": {
+                "filepath": "assets/sound.wav",
+                "playOnAwake": true
+            },
+            "script": "PlayerController"
+        },
+        {
+            "id": 4,
+            "tag": "Floor",
+            "transform": {
+                "position": [0.0, -2.0, 0.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [10.0, 1.0, 10.0]
+            },
+            "color": [0.35, 0.35, 0.35],
+            "rigidbody": {
+                "isStatic": true
+            }
+        }
+    ]
+}

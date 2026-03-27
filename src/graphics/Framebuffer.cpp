@@ -1,7 +1,10 @@
 #include "Framebuffer.h"
 
 #include <glad/glad.h>
-#include <cstdio>
+
+#include "../core/Log.h"
+
+#include <string>
 
 namespace engine {
 
@@ -51,14 +54,13 @@ bool Framebuffer::init(int width, int height)
     // -- Completeness check ---------------------------------------------------
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     {
-        std::fprintf(stderr, "[Framebuffer] ERROR: Framebuffer is not complete!\n");
+        GE_ERROR("[Framebuffer] Framebuffer is not complete!");
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         return false;
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    std::printf("[Framebuffer] Created %dx%d FBO (id %u) with entity-ID attachment\n",
-                m_width, m_height, m_FBO);
+    GE_INFO(std::string("[Framebuffer] Created ") + std::to_string(m_width) + "x" + std::to_string(m_height) + " FBO (id " + std::to_string(m_FBO) + ") with entity-ID attachment");
     return true;
 }
 

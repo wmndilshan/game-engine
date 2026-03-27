@@ -4,7 +4,9 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <stb_image.h>
 
-#include <cstdio>
+#include "../core/Log.h"
+
+#include <string>
 
 namespace engine {
 
@@ -116,7 +118,7 @@ static unsigned int compileSkyboxShader()
         {
             char log[512];
             glGetShaderInfoLog(vs, sizeof(log), nullptr, log);
-            std::fprintf(stderr, "[Skybox] Vertex shader error:\n%s\n", log);
+            GE_ERROR(std::string("[Skybox] Vertex shader error: ") + log);
         }
     }
 
@@ -131,7 +133,7 @@ static unsigned int compileSkyboxShader()
         {
             char log[512];
             glGetShaderInfoLog(fs, sizeof(log), nullptr, log);
-            std::fprintf(stderr, "[Skybox] Fragment shader error:\n%s\n", log);
+            GE_ERROR(std::string("[Skybox] Fragment shader error: ") + log);
         }
     }
 
@@ -155,7 +157,7 @@ static unsigned int compileSkyboxShader()
         {
             char log[512];
             glGetProgramInfoLog(program, sizeof(log), nullptr, log);
-            std::fprintf(stderr, "[Skybox] Shader link error:\n%s\n", log);
+            GE_ERROR(std::string("[Skybox] Shader link error: ") + log);
         }
     }
 
@@ -213,7 +215,7 @@ bool Skybox::init(const std::vector<std::string>& faces)
         }
         else
         {
-            std::fprintf(stderr, "[Skybox] Failed to load face: %s\n", faces[i].c_str());
+            GE_WARN(std::string("[Skybox] Failed to load face: ") + faces[i]);
             stbi_image_free(data);
             return false;
         }

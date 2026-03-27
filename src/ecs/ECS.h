@@ -31,6 +31,13 @@ public:
         return m_nextEntity++;
     }
 
+    Entity createEntity(Entity entity)
+    {
+        if (entity >= m_nextEntity)
+            m_nextEntity = entity + 1;
+        return entity;
+    }
+
     /// Reset the registry to a blank state (removes all entities and components).
     void clear()
     {
@@ -56,6 +63,13 @@ public:
         auto it = storage.find(entity);
         assert(it != storage.end() && "Entity does not have the requested component");
         return it->second;
+    }
+
+    template <typename T>
+    bool hasComponent(Entity entity)
+    {
+        auto& storage = getOrCreateStorage<T>();
+        return storage.find(entity) != storage.end();
     }
 
     /// Return the entire map of (Entity → T) for a given component type.

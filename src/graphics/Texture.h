@@ -29,6 +29,7 @@ public:
 
     int getWidth()  const { return m_Width; }
     int getHeight() const { return m_Height; }
+    unsigned int getID() const { return m_RendererID; }
 
 private:
     unsigned int m_RendererID = 0;

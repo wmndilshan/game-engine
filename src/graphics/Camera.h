@@ -45,6 +45,7 @@ public:
     void processKeyboard(CameraMovement direction, float deltaTime);
     void processMouseMovement(float xoffset, float yoffset,
                               bool constrainPitch = true);
+    void lookAt(const glm::vec3& target);
 
 private:
     void updateCameraVectors();

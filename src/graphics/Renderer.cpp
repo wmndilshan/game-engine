@@ -3,8 +3,11 @@
 #include <glad/glad.h>
 
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
-#include <cstdio>
+#include <string>
+
+#include "../core/Log.h"
 
 namespace engine {
 
@@ -24,6 +27,7 @@ out vec3 FragNormal;
 out vec3 FragPos;
 
 uniform mat4 model;
+uniform mat3 normalMatrix;
 uniform mat4 view;
 uniform mat4 projection;
 
@@ -31,7 +35,7 @@ void main()
 {
     vec4 worldPos = model * vec4(aPos, 1.0);
     FragPos   = worldPos.xyz;
-    FragNormal = mat3(model) * aNormal;   // simple normal transform (no non-uniform scale)
+    FragNormal = normalMatrix * aNormal;
     TexCoord   = aTexCoord;
     gl_Position = projection * view * worldPos;
 }
@@ -148,7 +152,7 @@ static GLuint compileShader(GLenum type, const char* source)
     {
         char info[512];
         glGetShaderInfoLog(shader, sizeof(info), nullptr, info);
-        std::fprintf(stderr, "[Shader Compile Error] %s\n", info);
+        GE_ERROR(std::string("[Renderer] Shader compile error: ") + info);
     }
     return shader;
 }
@@ -176,7 +180,7 @@ static GLuint linkProgram(GLuint vert, GLuint frag)
     {
         char info[512];
         glGetProgramInfoLog(program, sizeof(info), nullptr, info);
-        std::fprintf(stderr, "[Program Link Error] %s\n", info);
+        GE_ERROR(std::string("[Renderer] Program link error: ") + info);
     }
     return program;
 }
@@ -197,6 +201,7 @@ bool Renderer::init()
 
     // Cache uniform locations
     m_locModel      = glGetUniformLocation(m_shaderProgram, "model");
+    m_locNormalMatrix = glGetUniformLocation(m_shaderProgram, "normalMatrix");
     m_locView       = glGetUniformLocation(m_shaderProgram, "view");
     m_locProjection = glGetUniformLocation(m_shaderProgram, "projection");
 
@@ -265,10 +270,12 @@ void Renderer::drawCube(const glm::mat4& model,
 {
     glUseProgram(m_shaderProgram);
 
+    const glm::mat3 normalMatrix = glm::inverseTranspose(glm::mat3(model));
+
     glUniformMatrix4fv(m_locModel,      1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix3fv(m_locNormalMatrix, 1, GL_FALSE, glm::value_ptr(normalMatrix));
     glUniformMatrix4fv(m_locView,       1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(m_locProjection, 1, GL_FALSE, glm::value_ptr(projection));
-    glUniform1f(m_locHasTexture, 1.0f);  // built-in cubes use bound texture
     glUniform1i(m_locEntityID, entityID);
 
     glBindVertexArray(m_VAO);
@@ -285,12 +292,19 @@ void Renderer::beginScene(const glm::mat4& view, const glm::mat4& projection)
 
 void Renderer::setModelMatrix(const glm::mat4& model)
 {
+    const glm::mat3 normalMatrix = glm::inverseTranspose(glm::mat3(model));
     glUniformMatrix4fv(m_locModel, 1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix3fv(m_locNormalMatrix, 1, GL_FALSE, glm::value_ptr(normalMatrix));
 }
 
 void Renderer::setHasTexture(bool has)
 {
     glUniform1f(m_locHasTexture, has ? 1.0f : 0.0f);
+}
+
+void Renderer::setObjectColor(const glm::vec3& color)
+{
+    glUniform3f(m_locObjectColor, color.x, color.y, color.z);
 }
 
 void Renderer::setEntityID(int id)

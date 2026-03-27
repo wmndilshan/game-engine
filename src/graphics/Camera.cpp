@@ -65,6 +65,18 @@ void Camera::processMouseMovement(float xoffset, float yoffset,
     updateCameraVectors();
 }
 
+void Camera::lookAt(const glm::vec3& target)
+{
+    const glm::vec3 toTarget = target - Position;
+    if (glm::length(toTarget) < 0.0001f)
+        return;
+
+    const glm::vec3 direction = glm::normalize(toTarget);
+    Pitch = glm::degrees(std::asin(direction.y));
+    Yaw = glm::degrees(std::atan2(direction.z, direction.x));
+    updateCameraVectors();
+}
+
 // ── Internals ───────────────────────────────────────────────────────────────
 
 void Camera::updateCameraVectors()

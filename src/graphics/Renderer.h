@@ -35,6 +35,9 @@ public:
     /// Set whether the next draw call should use a bound texture (1) or flat colour (0).
     void setHasTexture(bool has);
 
+    /// Set the flat object colour used when not texturing.
+    void setObjectColor(const glm::vec3& color);
+
     /// Set the entity ID written to the picking colour attachment.
     void setEntityID(int id);
 
@@ -50,6 +53,7 @@ private:
     unsigned int m_VBO           = 0;
 
     int m_locModel       = -1;
+    int m_locNormalMatrix = -1;
     int m_locView        = -1;
     int m_locProjection  = -1;
     int m_locHasTexture  = -1;

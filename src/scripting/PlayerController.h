@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ScriptableEntity.h"
+#include "../audio/AudioSystem.h"
 #include "../core/Input.h"
 #include "../ecs/Components.h"
 
@@ -20,6 +21,15 @@ public:
 
         GLFWwindow* window = glfwGetCurrentContext();
         if (!window) return;
+
+        // Spacebar: play sound once per key press
+        const bool spaceDown = Input::isKeyPressed(window, GLFW_KEY_SPACE);
+        if (spaceDown && !m_spaceWasDown)
+        {
+            if (m_Audio)
+                (void)m_Audio->playSound("assets/sound.wav");
+        }
+        m_spaceWasDown = spaceDown;
 
         float moveX = 0.0f;
         float moveZ = 0.0f;
@@ -47,6 +57,9 @@ public:
         transform.position.x += moveX * speed * deltaTime;
         transform.position.z += moveZ * speed * deltaTime;
     }
+
+private:
+    bool m_spaceWasDown = false;
 };
 
 } // namespace engine

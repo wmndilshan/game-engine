@@ -52,6 +52,7 @@ FetchContent_Declare(
     GIT_TAG        v0.9.0
 )
 
+
 FetchContent_MakeAvailable(glfw glm imgui assimp reactphysics3d)
 
 # ── ImGui source files (core + GLFW/OpenGL3 backends) ───────────────────────
@@ -72,7 +73,10 @@ add_executable(${PROJECT_NAME}
     src/core/Window.cpp
     src/core/Application.cpp
     src/core/Input.cpp
+    src/core/Log.cpp
+    src/core/ConsolePanel.cpp
     src/core/SceneSerializer.cpp
+    src/audio/AudioSystem.cpp
     src/graphics/Renderer.cpp
     src/graphics/Camera.cpp
     src/graphics/Texture.cpp

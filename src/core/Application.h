@@ -2,6 +2,8 @@
 
 #include "Window.h"
 #include "Input.h"
+#include "Log.h"
+#include "ConsolePanel.h"
 #include "../graphics/Renderer.h"
 #include "../graphics/Camera.h"
 #include "../graphics/Texture.h"
@@ -10,6 +12,7 @@
 #include "../graphics/Skybox.h"
 #include "../ecs/ECS.h"
 #include "../physics/PhysicsSystem.h"
+#include "../audio/AudioSystem.h"
 
 #include <glm/gtc/type_ptr.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
@@ -36,6 +39,12 @@ public:
     /// Returns the process exit code.
     int run();
 
+    enum class SceneState
+    {
+        Edit,
+        Play
+    };
+
 private:
     void initImGui();
     void shutdownImGui();
@@ -49,6 +58,7 @@ private:
     Renderer      m_renderer;
     Registry      m_registry;
     PhysicsSystem m_physics;
+    AudioSystem   m_audio;
     Camera        m_camera{glm::vec3(0.0f, 0.0f, 7.0f)};
     Texture     m_crateTexture;
     Model       m_model;
@@ -70,6 +80,17 @@ private:
 
     // Gizmo operation (-1 = none, else ImGuizmo::OPERATION)
     int m_gizmoType = -1;
+
+    // Direct viewport drag state
+    bool      m_isDraggingEntity = false;
+    glm::vec3 m_dragOffset{0.0f, 0.0f, 0.0f};
+    glm::vec3 m_dragPlanePoint{0.0f, 0.0f, 0.0f};
+    glm::vec3 m_dragPlaneNormal{0.0f, 0.0f, 1.0f};
+
+    // Editor / runtime scene state
+    SceneState m_SceneState = SceneState::Edit;
+
+    ConsolePanel m_console;
 };
 
 } // namespace engine

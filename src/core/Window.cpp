@@ -4,6 +4,9 @@
 #include <GLFW/glfw3.h>
 
 #include <cstdio>
+#include <string>
+
+#include "Log.h"
 
 namespace engine {
 
@@ -11,7 +14,7 @@ namespace engine {
 
 static void glfwErrorCallback(int error, const char* description)
 {
-    std::fprintf(stderr, "[GLFW Error %d] %s\n", error, description);
+    GE_ERROR(std::string("[GLFW] Error ") + std::to_string(error) + ": " + (description ? description : "(null)"));
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -22,7 +25,7 @@ bool Window::init(int width, int height, const char* title)
 
     if (!glfwInit())
     {
-        std::fprintf(stderr, "Failed to initialize GLFW.\n");
+        GE_ERROR("Failed to initialize GLFW.");
         return false;
     }
 
@@ -37,7 +40,7 @@ bool Window::init(int width, int height, const char* title)
     // Attempt 2: Drop Core Profile requirement
     if (!m_window)
     {
-        std::fprintf(stderr, "Core Profile failed, retrying with Any Profile...\n");
+        GE_WARN("Core Profile failed, retrying with Any Profile...");
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -48,14 +51,14 @@ bool Window::init(int width, int height, const char* title)
     // Attempt 3: Accept whatever the driver can give us
     if (!m_window)
     {
-        std::fprintf(stderr, "GL 3.3 failed, retrying with default hints...\n");
+        GE_WARN("GL 3.3 failed, retrying with default hints...");
         glfwDefaultWindowHints();
         m_window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     }
 
     if (!m_window)
     {
-        std::fprintf(stderr, "Failed to create GLFW window after all attempts.\n");
+        GE_ERROR("Failed to create GLFW window after all attempts.");
         glfwTerminate();
         return false;
     }
@@ -66,16 +69,16 @@ bool Window::init(int width, int height, const char* title)
     // Load OpenGL function pointers via GLAD
     if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
     {
-        std::fprintf(stderr, "Failed to initialize GLAD.\n");
+        GE_ERROR("Failed to initialize GLAD.");
         glfwDestroyWindow(m_window);
         m_window = nullptr;
         glfwTerminate();
         return false;
     }
 
-    std::printf("OpenGL %s  |  GLSL %s\n",
-                glGetString(GL_VERSION),
-                glGetString(GL_SHADING_LANGUAGE_VERSION));
+    const char* glVersion = reinterpret_cast<const char*>(glGetString(GL_VERSION));
+    const char* glslVersion = reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION));
+    GE_INFO(std::string("OpenGL ") + (glVersion ? glVersion : "(null)") + "  |  GLSL " + (glslVersion ? glslVersion : "(null)"));
 
     return true;
 }

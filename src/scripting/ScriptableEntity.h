@@ -4,6 +4,8 @@
 
 namespace engine {
 
+class AudioSystem;
+
 class ScriptableEntity
 {
 public:
@@ -21,6 +23,7 @@ public:
 
     Entity    m_Entity  = 0;
     Registry* m_Registry = nullptr;
+    AudioSystem* m_Audio = nullptr;
 };
 
 } // namespace engine

@@ -4,7 +4,9 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include <cstdio>
+#include <string>
+
+#include "../core/Log.h"
 
 namespace engine {
 
@@ -19,13 +21,13 @@ bool Model::loadModel(const std::string& path)
 
     if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !scene->mRootNode)
     {
-        std::fprintf(stderr, "[Model] Assimp error: %s\n", importer.GetErrorString());
+        GE_ERROR(std::string("[Model] Assimp error: ") + importer.GetErrorString());
         return false;
     }
 
     processNode(scene->mRootNode, scene);
 
-    std::printf("[Model] Loaded '%s' — %zu mesh(es)\n", path.c_str(), meshes.size());
+    GE_INFO(std::string("[Model] Loaded '") + path + "' - " + std::to_string(meshes.size()) + " mesh(es)");
     return true;
 }
 

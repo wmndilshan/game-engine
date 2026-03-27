@@ -6,7 +6,7 @@
 
 #include <glad/glad.h>
 
-#include <cstdio>
+#include "../core/Log.h"
 
 namespace engine {
 
@@ -20,7 +20,7 @@ bool Texture::init(const std::string& path)
     unsigned char* data = stbi_load(path.c_str(), &m_Width, &m_Height, &m_BPP, 0);
     if (!data)
     {
-        std::fprintf(stderr, "[Texture] Failed to load: %s\n", path.c_str());
+        GE_WARN(std::string("[Texture] Failed to load: ") + path);
         return false;
     }
 
@@ -60,8 +60,7 @@ bool Texture::init(const std::string& path)
     glBindTexture(GL_TEXTURE_2D, 0);
     stbi_image_free(data);
 
-    std::printf("[Texture] Loaded %s (%dx%d, %d channels)\n",
-                path.c_str(), m_Width, m_Height, m_BPP);
+    GE_INFO(std::string("[Texture] Loaded ") + path + " (" + std::to_string(m_Width) + "x" + std::to_string(m_Height) + ", " + std::to_string(m_BPP) + " channels)");
     return true;
 }
 

@@ -1,5 +1,6 @@
 # Build output
 build/
+build-mingw/
 
 # IDE / editor
 .vscode/
@@ -21,3 +22,8 @@ Desktop.ini
 
 # Dependencies fetched by CMake
 _deps/
+
+# Runtime / local artifacts
+Engine3D.log
+imgui.ini
+assets/temp_play_state.json
